@@ -630,12 +630,6 @@ function! s:ag_handler(lines, with_column)
     return
   endif
 
-  if a:lines[0] == ''
-    execute 'q!'
-    let hashes = join(split(a:lines[1], ":")[3:], ":")
-    return s:yank_to_register(hashes)
-  end
-
   if a:lines[0] == 'ctrl-y'
     let hashes = join(split(a:lines[1], ":")[3:], ":")
     return s:yank_to_register(hashes)
@@ -715,23 +709,8 @@ endfunction
 " ------------------------------------------------------------------
 " Yank
 " ------------------------------------------------------------------
-function! s:yank_to_register(data)
-  let @" = a:data
-  silent! let @* = a:data
-  silent! let @+ = a:data
-endfunction
 
-function! s:ag_to_qf(line, with_column)
-  let parts = split(a:line, ':')
-  let text = join(parts[(a:with_column ? 3 : 2):], ':')
-  let dict = {'filename': &acd ? fnamemodify(parts[0], ':p') : parts[0], 'lnum': parts[1], 'text': text}
-  if a:with_column
-    let dict.col = parts[2]
-  endif
-  return dict
-endfunction
-
-function! s:ag_handler(lines, with_column)
+function! s:yank_handler(lines, with_column)
   if len(a:lines) < 2
     return
   endif
@@ -774,19 +753,19 @@ function! fzf#vim#yank(query, ...)
   let args = copy(a:000)
   let ag_opts = len(args) > 1 && type(args[0]) == s:TYPE.string ? remove(args, 0) : ''
   let command = ag_opts . ' ' . fzf#shellescape(query)
-  return call('fzf#vim#ag_raw', insert(args, command, 0))
+  return call('fzf#vim#yank_raw', insert(args, command, 0))
 endfunction
 
 " ag command suffix, [options]
-function! fzf#vim#ag_raw(command_suffix, ...)
+function! fzf#vim#yank_raw(command_suffix, ...)
   if !executable('ag')
     return s:warn('ag is not found')
   endif
-  return call('fzf#vim#grep', extend(['ag --nogroup --column --color '.a:command_suffix, 1], a:000))
+  return call('fzf#vim#yankgrep', extend(['ag --nogroup --column --color '.a:command_suffix, 1], a:000))
 endfunction
 
 " command, with_column, [options]
-function! fzf#vim#grep(grep_command, with_column, ...)
+function! fzf#vim#yankgrep(grep_command, with_column, ...)
   let words = []
   for word in split(a:grep_command)
     if word !~# '^[a-z]'
@@ -806,7 +785,7 @@ function! fzf#vim#grep(grep_command, with_column, ...)
   \             '--color', 'hl:68,hl+:110', '--expect=ctrl-y,'.expect_keys]
   \}
   function! opts.sink(lines)
-    return s:ag_handler(a:lines, self.column)
+    return s:yank_handler(a:lines, self.column)
   endfunction
   let opts['sink*'] = remove(opts, 'sink')
   return s:fzf(name, opts, a:000)
